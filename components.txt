@@ -1,0 +1,73 @@
+Key Distribution Center [Server Node]
+
+  - Authentication Server
+    - receives:
+      - plaintext request for ticket granting ticket (username, name_of_service_requesting, nw_address, lifetime_of_tgt)
+    - process:
+      - checks whether the given username is in the kdc database (no credential check, only username lookup)
+      - if success:
+        - generates a random key called SESSION KEY for use between client and TGS.
+    - sends:
+        - Ticket_Granting_Ticket = ENC(TGS_SECRET_KEY, (username, name_of_service_requested, timestamp, nw_address, lifetime_of_tgt, TGS_SESSION_KEY))
+        - Authentication_ACK = ENC(CLIENT_SECRET_KEY, (name_of_service_requested, timestamp, lifetime_of_tgt, TGS_SESSION_KEY))
+        - [Authentication_ACK_ENCRYPTED, Ticket_Granting_Ticket_ENCRYPTED]
+
+
+  - Ticket Granting Server
+    - receives:
+      - [AUTHENTICATOR, TICKET_GRANTING_REQUEST, ENCRYPTED_TICKET_GRANTING_TICKET_FROM_AS]
+    - process:
+      - checks if the requested service is present in the KDC Database
+      - if success:
+        - TGS decrypts the ENCRYPTED_TICKET_GRANTING_TICKET_FROM_AS with it's SECRET_KEY
+        - DECRYPT(TGS_SESSION_KEY, AUTHENTICATOR)
+      - checks username from authenticator with TGT, timestamp from AUTHENTICATOR with TGT, threshold 2 minutes)
+      - is TGT expired?
+      - is AUTHENTICATOR already in TGS CACHE? 
+      - compare nw_address
+      - if above are success, generate a random SESSION_KEY for requested Service.
+    - sends:
+        - SERVICE_TICKET = ENC(SERVICE_SECRET_KEY, (username, service_name, nw_address, timestamp, lifetime_of_this_ticket, SERVICE_SESSION_KEY))
+        - Authentication_ACK = ENC(TGS_SESSION_KEY, (service_name, timestamp, lifetime_of_the_service_ticket, SERVICE_SESSION_KEY))
+      - [Authentication_ACK_ENCRYPTED, SERVICE_TICKET_ENCRYPTED]
+
+
+  - KDC Database:
+    - LIST OF USERS WITH THEIR SHARED SECRET KEY
+    - LIST OF SERVICES (TGS & OTHER SERVICES) WITH THEIR SECRET KEY
+
+-------------------------------------------------------------------------------------
+
+Client Node:
+  - With AS
+    - sends:
+      - plaintext request (username, service_name(tgs), nw_address, lifetime_of_tgt)
+    - receives:
+      - [Authentication_ACK_ENCRYPTED_CAN_BE_OPENED, Ticket_Granting_Ticket_ENCRYPTED_COULD_NOT_BE_OPENED] 
+  - With TGS
+    - sends:
+      - AUTHENTICATOR = ENC(TGS_SESSION_KEY, (username, timestamp))
+      - TICKET_GRANTING _REQUEST = plaintext request (service_name, lifetime_of_service_ticket)
+      - ENCRYPTED_TICKET_GRANTING_TICKET_FROM_AS
+    - receives:
+      - [Authentication_ACK_ENCRYPTED_CAN_BE_OPENED, SERVICE_TICKET_ENCRYPTED_CANNOT_BE_OPENED]
+
+---------------------------------------------------------------------------------------
+
+Information to Remember:
+-----------------------
+
+Encryption Algorithm (for symmetric key):
+  - AES256
+----------------------------------------
+KNOWN TO CLIENT:
+  - SHARED SECRET KEY WITH AS
+  - CLIENT ID
+  - SERVICE TO ACCESS
+KNOWN TO AS:
+  - SECRET KEY OF USER
+  - SECRET KEY OF TGS
+----------------------
+KNOWN TO TGS:
+  - LIST OF AVAILABLE SERVICES
+  - SECRET KEYS OF SERVICES
